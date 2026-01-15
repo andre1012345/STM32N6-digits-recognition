@@ -29,10 +29,6 @@
 #define ASPECT_RATIO_FULLSCREEN (3) /* Resize camera image to NN input size and display a maximized image. See Doc/Build-Options.md#aspect-ratio-mode */
 #define ASPECT_RATIO_MODE ASPECT_RATIO_FULLSCREEN
 
-#define NN_WIDTH 96
-#define NN_HEIGHT 96
-#define NN_BPP 3
-
 #define COLOR_BGR (0)
 #define COLOR_RGB (1)
 #define COLOR_MODE COLOR_RGB
