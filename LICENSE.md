@@ -12,7 +12,6 @@
 | Fonts                                                                | STMicroelectronics                    | BSD-3-Clause
 | lcd                                                                  | STMicroelectronics                    | BSD-3-Clause
 | Middlewares/stedgeai-lib                                             | STMicroelectronics                    | SLA0044
-| Middlewares/ai-postprocessing-wrapper                                | STMicroelectronics                    | SLA0044
 | Middlewares/stm32-mw-camera                                          | STMicroelectronics                    | SLA0044
 | Middlewares/stm32-mw-camera/ISP_Library                              | STMicroelectronics                    | SLA0044
 | Middlewares/stm32-mw-camera/sensors                                  | STMicroelectronics                    | BSD-3-Clause

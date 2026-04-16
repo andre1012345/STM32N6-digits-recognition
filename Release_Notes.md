@@ -21,11 +21,9 @@ This application is prebuilt with an image classification model.
 
 | Name                                        | Version             | Release notes
 |-----                                        | -------             | -------------
-| STM32Cube.AI runtime                        |  v11.0.0            |
-| ai-postprocessing-wrapper                   |  v1.0.9             | [release notes](Middlewares/ai-postprocessing-wrapper/Release_Notes.md)
-| screenl                                     |  v3.0.0             | [release notes](Middlewares/screenl/Release_Notes.md)
-| Camera Middleware                           |  v1.5.0             | [release notes](Middlewares/stm32-mw-camera/Release_Notes.md)
-| stm32-vision-models-postprocessing Library  |  v0.13.0            | [release notes](Middlewares/stm32-vision-models-postprocessing/lib_vision_models_pp/README.md)
+| STM32Cube.AI runtime                        |  v12.0.0            |
+| screenl                                     |  v3.0.2             | [release notes](Middlewares/screenl/Release_Notes.md)
+| Camera Middleware                           |  v1.5.1             | [release notes](Middlewares/stm32-mw-camera/Release_Notes.md)
 | CMSIS                                       |  v6.2.0             | [release notes](STM32Cube_FW_N6/Drivers/CMSIS/st_readme.txt)
 | STM32N6xx CMSIS Device                      |  v1.3.0             | [release notes](STM32Cube_FW_N6/Drivers/CMSIS/Device/ST/STM32N6xx/Release_Notes.html)
 | STM32N6xx HAL/LL Drivers                    |  v1.3.0             | [release notes](STM32Cube_FW_N6/Drivers/STM32N6xx_HAL_Driver/Release_Notes.html)
@@ -51,6 +49,13 @@ This application is prebuilt with an image classification model.
 
 ## Update history
 
+### v2.3.0 / April 2026
+
+- New configuration for ModelZoo allows deploying larger models by storing epoch controller blob in flash memory
+- Update inference function
+- Update STEdgeAI to v4.0.0
+- Add Yolo-D and new SSD models support
+
 ### v2.2.0 / January 2026
 
 - Update Camera Middleware to v1.5.0, adding VD1943 support
@@ -61,8 +66,6 @@ This application is prebuilt with an image classification model.
 ### v2.1.1 / August 2025
 
 - Update Camera Middleware to v1.4.3
-- Update lib_vision_models_pp to v0.10.0
-- Update ai-postprocessing-wrapper to v1.0.7
 - Update screenl to v3.0.0
 - Documentation improvements
 

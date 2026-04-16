@@ -401,7 +401,7 @@ STAI_API_DECLARE_END
   }
 #define STAI_NETWORK_WEIGHTS_NAMES \
   { \
-    "Conv2D_7_weights", "Conv2D_16_weights", "Conv2D_25_weights", "Conv2D_34_weights", "Conv2D_43_weights", "Conv2D_48_weights", "Conv2D_52_weights", "Conv2D_61_weights", "Conv2D_66_weights", "Conv2D_70_weights", "Conv2D_75_weights", "Conv2D_79_weights", "Conv2D_84_weights", "Conv2D_88_weights", "Conv2D_93_weights", "Conv2D_97_weights", "Conv2D_102_weights", "Conv2D_106_weights", "Conv2D_115_weights", "Conv2D_120_weights", "Conv2D_124_weights", "Dequantize_135_x_scale", "Dequantize_135_x_zero_point", "Gemm_130_weights_transposed_3", "Conv2D_12_weights_inflated_259", "Conv2D_21_weights_inflated_261", "Conv2D_30_weights_inflated_263", "Conv2D_39_weights_inflated_265", "Conv2D_57_weights_inflated_268", "Conv2D_111_weights_inflated_275", "Gemm_130_squeeze_y_5_366_atonn_internal_scale", "Gemm_130_squeeze_y_5_366_atonn_internal_offset", "Softmax_133_368_atonn_internal_scale", "Softmax_133_368_atonn_internal_offset" \
+    "Conv2D_7_weights", "Conv2D_16_weights", "Conv2D_25_weights", "Conv2D_34_weights", "Conv2D_43_weights", "Conv2D_48_weights", "Conv2D_52_weights", "Conv2D_61_weights", "Conv2D_66_weights", "Conv2D_70_weights", "Conv2D_75_weights", "Conv2D_79_weights", "Conv2D_84_weights", "Conv2D_88_weights", "Conv2D_93_weights", "Conv2D_97_weights", "Conv2D_102_weights", "Conv2D_106_weights", "Conv2D_115_weights", "Conv2D_120_weights", "Conv2D_124_weights", "Dequantize_135_x_scale", "Dequantize_135_x_zero_point", "Gemm_130_weights_transposed_3", "Conv2D_12_weights_inflated_259", "Conv2D_21_weights_inflated_261", "Conv2D_30_weights_inflated_263", "Conv2D_39_weights_inflated_265", "Conv2D_57_weights_inflated_268", "Conv2D_111_weights_inflated_275", "Gemm_130_squeeze_y_5_732_atonn_internal_scale", "Gemm_130_squeeze_y_5_732_atonn_internal_offset", "Softmax_133_736_atonn_internal_scale", "Softmax_133_736_atonn_internal_offset" \
   }
 #define STAI_NETWORK_WEIGHTS_FORMATS \
   { \
@@ -1161,7 +1161,7 @@ STAI_API_DECLARE_END
   }
 
 #define STAI_NETWORK_WEIGHTS_31_ALIGNMENT (16)
-#define STAI_NETWORK_WEIGHTS_31_NAME "Gemm_130_squeeze_y_5_366_atonn_internal_scale"
+#define STAI_NETWORK_WEIGHTS_31_NAME "Gemm_130_squeeze_y_5_732_atonn_internal_scale"
 #define STAI_NETWORK_WEIGHTS_31_FLAGS (STAI_FLAG_PREALLOCATED)
 #define STAI_NETWORK_WEIGHTS_31_FORMAT (STAI_FORMAT_FLOAT32)
 #define STAI_NETWORK_WEIGHTS_31_SIZE (1)
@@ -1183,7 +1183,7 @@ STAI_API_DECLARE_END
   }
 
 #define STAI_NETWORK_WEIGHTS_32_ALIGNMENT (32)
-#define STAI_NETWORK_WEIGHTS_32_NAME "Gemm_130_squeeze_y_5_366_atonn_internal_offset"
+#define STAI_NETWORK_WEIGHTS_32_NAME "Gemm_130_squeeze_y_5_732_atonn_internal_offset"
 #define STAI_NETWORK_WEIGHTS_32_FLAGS (STAI_FLAG_PREALLOCATED)
 #define STAI_NETWORK_WEIGHTS_32_FORMAT (STAI_FORMAT_Q7)
 #define STAI_NETWORK_WEIGHTS_32_SIZE (1)
@@ -1205,7 +1205,7 @@ STAI_API_DECLARE_END
   }
 
 #define STAI_NETWORK_WEIGHTS_33_ALIGNMENT (32)
-#define STAI_NETWORK_WEIGHTS_33_NAME "Softmax_133_368_atonn_internal_scale"
+#define STAI_NETWORK_WEIGHTS_33_NAME "Softmax_133_736_atonn_internal_scale"
 #define STAI_NETWORK_WEIGHTS_33_FLAGS (STAI_FLAG_PREALLOCATED)
 #define STAI_NETWORK_WEIGHTS_33_FORMAT (STAI_FORMAT_FLOAT32)
 #define STAI_NETWORK_WEIGHTS_33_SIZE (1)
@@ -1227,7 +1227,7 @@ STAI_API_DECLARE_END
   }
 
 #define STAI_NETWORK_WEIGHTS_34_ALIGNMENT (16)
-#define STAI_NETWORK_WEIGHTS_34_NAME "Softmax_133_368_atonn_internal_offset"
+#define STAI_NETWORK_WEIGHTS_34_NAME "Softmax_133_736_atonn_internal_offset"
 #define STAI_NETWORK_WEIGHTS_34_FLAGS (STAI_FLAG_PREALLOCATED)
 #define STAI_NETWORK_WEIGHTS_34_FORMAT (STAI_FORMAT_Q7)
 #define STAI_NETWORK_WEIGHTS_34_SIZE (1)
