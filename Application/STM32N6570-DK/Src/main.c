@@ -100,6 +100,12 @@ static uint8_t dcmipp_out_nn[DCMIPP_OUT_NN_BUFF_LEN];
 #define DCMIPP_NN_NEEDS_CROP 0
 #endif
 
+/* Intermediate uint8 capture buffer: DCMIPP always writes uint8 RGB888 here;
+   a software step converts it to float32 in nn_in before inference. */
+#define NN_RAW_BUF_SIZE (STAI_NETWORK_IN_1_WIDTH * STAI_NETWORK_IN_1_HEIGHT * 3)
+__attribute__((aligned(32)))
+static uint8_t nn_raw[NN_RAW_BUF_SIZE];
+
 /* model */
 STAI_NETWORK_CONTEXT_DECLARE(network_context, STAI_NETWORK_CONTEXT_SIZE)
 /* Lcd Background Buffer */
@@ -187,8 +193,8 @@ int main(void)
     /* Start NN camera single capture Snapshot into intermediate buffer */
     CameraPipeline_NNPipe_Start(dcmipp_out_nn, CMW_MODE_SNAPSHOT);
 #else
-    /* Start NN camera single capture Snapshot directly into NN input */
-    CameraPipeline_NNPipe_Start(nn_in, CMW_MODE_SNAPSHOT);
+    /* Start NN camera single capture Snapshot into raw uint8 buffer */
+    CameraPipeline_NNPipe_Start(nn_raw, CMW_MODE_SNAPSHOT);
 #endif
 
     while (cameraFrameReceived == 0) {};
@@ -199,12 +205,33 @@ int main(void)
 #if DCMIPP_NN_NEEDS_CROP
     /*
      * Crop the image: the DCMIPP hardware requires output dimensions to be
-     * multiples of 16, so we crop the padded buffer into the NN input buffer.
+     * multiples of 16, so we crop the padded buffer into nn_raw.
      */
     SCB_InvalidateDCache_by_Addr(dcmipp_out_nn, sizeof(dcmipp_out_nn));
-    img_crop(dcmipp_out_nn, nn_in, pitch_nn, STAI_NETWORK_IN_1_WIDTH, STAI_NETWORK_IN_1_HEIGHT, STAI_NETWORK_IN_1_CHANNEL);
-    SCB_CleanInvalidateDCache_by_Addr(nn_in, nn_in_len);
+    img_crop(dcmipp_out_nn, nn_raw, pitch_nn, STAI_NETWORK_IN_1_WIDTH, STAI_NETWORK_IN_1_HEIGHT, STAI_NETWORK_IN_1_CHANNEL);
+#else
+    /* Invalidate dcache for the DMA-written nn_raw before CPU reads it */
+    SCB_InvalidateDCache_by_Addr(nn_raw, sizeof(nn_raw));
 #endif
+
+    /* Preprocess: uint8 RGB888 → float32 grayscale, inverted, normalized [0,1] */
+    {
+      const uint8_t *src = nn_raw;
+      float         *dst = (float *)nn_in;
+      for (int i = 0; i < STAI_NETWORK_IN_1_WIDTH * STAI_NETWORK_IN_1_HEIGHT; i++)
+      {
+        uint8_t r = src[3*i + 0];
+        uint8_t g = src[3*i + 1];
+        uint8_t b = src[3*i + 2];
+        /* BT.601 luminance, then invert (black-on-white → white-on-black MNIST) */
+        float gray = (0.299f * r + 0.587f * g + 0.114f * b);
+        float val  = (255.0f - gray) / 255.0f;
+        dst[3*i + 0] = val;
+        dst[3*i + 1] = val;
+        dst[3*i + 2] = val;
+      }
+      SCB_CleanInvalidateDCache_by_Addr(nn_in, STAI_NETWORK_IN_1_SIZE_BYTES);
+    }
 
     ts[0] = HAL_GetTick();
     /* run ATON inference */
@@ -431,8 +458,13 @@ void Network_Postprocess(void)
 
   Bubblesort((float *) (pp_input), ranking, NB_CLASSES);
 
-  nn_top1_output_class_name = classes_table[ranking[0]];
+  nn_top1_output_class_name  = classes_table[ranking[0]];
   nn_top1_output_class_proba = *((float *) (pp_input));
+
+  if (nn_top1_output_class_proba < 0.7f)
+  {
+    nn_top1_output_class_name = "Failed to classify the actual digit";
+  }
 }
 
 /**

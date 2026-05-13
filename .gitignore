@@ -1,0 +1,12 @@
+# STM32CubeIDE build outputs
+**/STM32CubeIDE/Debug/
+**/STM32CubeIDE/ModelZoo/
+**/STM32CubeIDE/.settings/
+
+# Compiler artifacts
+*.o
+*.d
+*.su
+*.cyclo
+*.map
+*.list
