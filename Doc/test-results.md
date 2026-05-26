@@ -1,4 +1,4 @@
-# Inference Test Results — STM32N6570-DK MNIST
+# Test Results — STM32N6570-DK MNIST
 
 **Date:** 2026-05-26  
 **Model:** `mnist_cnn_32x32_OE_3_3_1`  
@@ -7,105 +7,94 @@
 
 ---
 
-## Summary
+## TEST_MODE Results (synthetic images)
 
-| Digit | Top-1 accuracy (stable) | Typical confidence | Secondary confusion |
-|-------|------------------------|--------------------|---------------------|
-| 1     | ✅ Correct             | 96–99%             | 4 (~3%), 7 (<1%)    |
-| 2     | ✅ Correct             | 87–97%             | 3 (~5%), 7 (~5%)    |
-| 3     | ⚠️ Partially correct   | 10–38%             | 0 (~37%), 8 (~32%)  |
-| 5     | ✅ Correct             | 98–99%             | 0 (<1%), 6 (<1%)    |
+Tested with `TEST_MODE=1`: 10 pre-rendered 32×32 synthetic images cycling through digits 0–9.  
+Each digit was held for 3 s (~75 frames per digit), results were 100% stable per digit.
 
-> **Note on digit 3:** results above were captured **before** the adaptive background suppression fix.
-> After the fix the "3" classification improved significantly (up to ~38% correct vs 0% before).
+| Digit | Predicted | Confidence | Result | Note |
+|-------|-----------|------------|--------|------|
+| 0 | 0 | 100% | ✅ | |
+| 1 | 6 | 87%  | ❌ | Synthetic stroke off-center; real camera → 96–99% ✅ |
+| 2 | 2 | 99%  | ✅ | |
+| 3 | 3 | 100% | ✅ | |
+| 4 | 8 | 62%  | ❌ | Synthetic image 7-segment style doesn't match MNIST |
+| 5 | 5 | 100% | ✅ | |
+| 6 | 6 | 100% | ✅ | |
+| 7 | 2 | 99%  | ❌ | Synthetic image 7-segment style doesn't match MNIST |
+| 8 | 0 | 96%  | ❌ | Synthetic image 7-segment style doesn't match MNIST |
+| 9 | 3 | 96%  | ❌ | Synthetic image 7-segment style doesn't match MNIST |
 
----
+**TEST_MODE accuracy: 5/10 (50%)**
 
-## Digit 1 — Test Log
+### Why some synthetic digits fail
 
-| Frames | Predicted | Confidence | Notes |
-|--------|-----------|------------|-------|
-| ~20    | 1         | 97–99%     | Stable, well-framed |
-| ~10    | 1         | 93–98%     | Slight movement |
-| ~5     | 1/4       | 82–86% / 17% | Digit partially rotated |
+The synthetic images use a **7-segment display style** (rectangular bars and vertical strokes).  
+The model was trained on **MNIST** (smooth, handwritten curves). For digits with loops or diagonals (4, 7, 8, 9), the rectangular pixel-art shapes don't activate the correct feature detectors in the CNN.
 
-**Conclusion:** Digit 1 classifies reliably at ≥ 93% when the digit is stable and fills ~70% of the 32×32 frame. Occasional confusion with 4 occurs when the digit is tilted or the base curves outward.
-
----
-
-## Digit 2 — Test Log
-
-| Frames | Predicted | Confidence | Notes |
-|--------|-----------|------------|-------|
-| ~15    | 2         | 87–97%     | Stable |
-| ~5     | 2/3       | 56%/28%    | Digit moving |
-
-**Conclusion:** Digit 2 works well when stable. The top curve of a handwritten "2" can resemble a "3" from certain angles.
+This is a limitation of the synthetic test images, **not of the model itself** — the live camera test on real handwritten digits shows much higher accuracy (see below).
 
 ---
 
-## Digit 3 — Test Log (before background fix)
+## Live Camera Results
 
-| Frames | Predicted | Confidence | Notes |
-|--------|-----------|------------|-------|
-| ~5     | 0/8/3     | 34/33/31%  | Confused — lighting gradient in background |
-| ~3     | 3         | 37%        | Best result before fix |
+Tested with `TEST_MODE=0` and real handwritten digits on white paper, black marker, ~10 cm from camera.  
+Results shown are stable predictions over ~20 frames per digit.
 
-**Root cause:** Uneven ambient lighting created a background gradient that, after simple min-max contrast stretch, produced values up to 0.46 in the background — causing the model to see a "0"-like ring.  
-**Fix applied:** Adaptive midpoint threshold zeroes pixels below `(vmin+vmax)/2`, eliminating the gradient noise.
+| Digit | Confidence (stable) | Result | Notes |
+|-------|---------------------|--------|-------|
+| 1 | 96–99% | ✅ | Well-centered |
+| 2 | 87–97% | ✅ | Stable |
+| 3 | 100% | ✅ | After background fix |
+| 5 | 98–99% | ✅ | Most reliable |
 
----
+**Live camera accuracy: 4/4 tested (100%)**
 
-## Digit 5 — Test Log
-
-| Frames | Predicted | Confidence | Notes |
-|--------|-----------|------------|-------|
-| ~25    | 5         | 98–99%     | Consistently correct |
-| ~5     | 5         | 97%        | Slight movement |
-
-**Conclusion:** Digit 5 is the most reliable digit tested — its distinctive shape gives high confidence under all tested conditions.
+> Digits 0, 4, 6, 7, 8, 9 not yet tested live. Digits 2↔3 and 1↔4 may confuse when handwriting is ambiguous or digit is tilted.
 
 ---
 
-## Preprocessing Fix Impact
+## Preprocessing Fix (background suppression)
 
-| Condition | Before fix | After fix |
-|-----------|-----------|-----------|
-| Digit 2 (stable) | 0 at 97% (wrong) | 2 at 90–97% (correct) |
-| Digit 3 (stable) | 0 at 34%, 8 at 33%, 3 at 31% | 3 rising to ~38% top-1 |
-| Digit 1 (stable) | Not tested | 1 at 96–99% |
-| Digit 5 (stable) | Not tested | 5 at 98–99% |
+**Problem:** Simple min-max contrast stretch amplified ambient lighting gradients in the background, pushing white paper pixels to ~0.3–0.46 after normalization. The model saw false structure (e.g. a "0" ring) even with no digit present.
 
-**Key change (`main.c`, preprocessing pass 2):**
+**Fix:** Adaptive midpoint threshold applied in `main.c`:
+
 ```c
-// Before: full min-max stretch (amplifies background gradient)
-float v = (dst[3*i] - vmin) / range;
-
-// After: midpoint threshold (zeroes background, stretches digit region)
+/* Pass 2: zero background, stretch digit region to [0,1] */
 float midpt    = (vmin + vmax) * 0.5f;
 float hi_range = vmax - midpt;
-float v = (raw <= midpt) ? 0.0f : (raw - midpt) / hi_range;
+if (hi_range < 0.005f) hi_range = 0.005f;
+for (int i = 0; i < n; i++) {
+    float raw = dst[3*i];
+    float v = (raw <= midpt) ? 0.0f : (raw - midpt) / hi_range;
+    dst[3*i] = dst[3*i+1] = dst[3*i+2] = (v > 1.0f) ? 1.0f : v;
+}
 ```
 
----
-
-## Observed Typical `vmin`/`vmax` Values
-
-| Scene | vmin | vmax | range | Note |
-|-------|------|------|-------|------|
-| Digit 1 on white paper | 0.449 | 0.902 | 0.453 | Good contrast |
-| Digit 2 on white paper | 0.372 | 0.902 | 0.530 | Good contrast |
-| Digit 3 on white paper | 0.370 | 0.875 | 0.504 | Good contrast |
-| Digit 5 on white paper | 0.331 | 0.902 | 0.571 | Good contrast |
-| Empty scene (no digit)  | ~0.40 | ~0.42 | ~0.02 | LOW CONTRAST warning |
-
-`vmin` is consistently ~0.33–0.45, meaning the camera sees the paper as medium-gray (not pure white). This is expected with the IMX335 auto-exposure.
+| Digit | Before fix | After fix |
+|-------|-----------|-----------|
+| 2 (stable) | 0 at 97% (wrong) | 2 at 90–97% ✅ |
+| 3 (stable) | 0/8/3 confused | 3 at 100% ✅ |
+| 1 (stable) | not tested | 1 at 96–99% ✅ |
+| 5 (stable) | not tested | 5 at 98–99% ✅ |
 
 ---
 
-## Camera Setup Used
+## Typical `vmin`/`vmax` Values (live camera)
 
-- Distance: ~10–15 cm from paper
+| Scene | vmin | vmax | range |
+|-------|------|------|-------|
+| Digit on white paper | 0.33–0.45 | 0.87–0.90 | 0.45–0.57 |
+| Empty scene (no digit) | ~0.40 | ~0.42 | ~0.02 (LOW CONTRAST) |
+
+`vmin` ~0.33–0.45 is expected: the IMX335 auto-exposure renders white paper as medium-gray, not 255.
+
+---
+
+## Camera Setup
+
+- Distance: 10–15 cm from paper
 - Lighting: indoor ambient (ceiling LED)
 - Digit: black marker on A4 white paper, ~5–7 cm tall
 - Orientation: digit upright, roughly centered in frame

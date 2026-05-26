@@ -36,7 +36,7 @@
 #include "stlogo.h"
 #include "arm_math.h"
 
-#define TEST_MODE 0  /* 0 = live camera, 1 = synthetic digit cycling */
+#define TEST_MODE 1  /* 0 = live camera, 1 = synthetic digit cycling */
 #if TEST_MODE
 #include "digits.h"
 #define DIGIT_HOLD_MS 3000  /* ms to hold each digit before advancing */
@@ -185,11 +185,63 @@ int main(void)
   printf("Build : %s %s\r\n", __DATE__, __TIME__);
   printf("========================================\r\n");
 
+  /*
+   * =========================================================================
+   *  PIPELINE OVERVIEW
+   * =========================================================================
+   *
+   *  IMX335 camera
+   *    │  CSI-2 → DCMIPP (hardware scaler)
+   *    ├─ Pipe 1 (continuous): full-res RGB565 → lcd_bg_buffer  (LCD preview)
+   *    └─ Pipe 2 (snapshot):   32×32 RGB888  → nn_raw[3072]
+   *
+   *  nn_raw  uint8[32×32×3]  — raw camera pixels, one frame per inference
+   *    │
+   *    │  [CPU] Preprocessing — two passes over 1024 pixels
+   *    │
+   *    │  Pass 1: inverted grayscale
+   *    │    gray = 0.299·R + 0.587·G + 0.114·B   (Rec.601 luma)
+   *    │    val  = (255 − gray) / 255             (invert: ink→bright, paper→dark)
+   *    │    → scan all pixels to find vmin and vmax
+   *    │
+   *    │  Pass 2: adaptive background suppression
+   *    │    midpt    = (vmin + vmax) / 2
+   *    │    hi_range = vmax − midpt
+   *    │    v = 0.0                      if val ≤ midpt   (background → 0)
+   *    │    v = (val − midpt) / hi_range if val > midpt   (digit → [0,1])
+   *    │    Replicate v into R,G,B (model expects 3-channel float32 input).
+   *    │    Rationale: simple min-max stretch amplifies uneven lighting in the
+   *    │    background (vmin≈0.33–0.45 on white paper), pushing background pixels
+   *    │    to ~0.3 after stretch and causing the classifier to see false structure
+   *    │    (e.g. a "0" ring).  The midpoint threshold forces background to exactly
+   *    │    0.0, matching the MNIST training distribution.
+   *    │
+   *    ▼
+   *  nn_in   float32[32×32×3 = 12 288 bytes]  — model input tensor
+   *    │
+   *    │  [NPU] Neural-ART CNN inference — mnist_cnn_32x32_OE_3_3_1
+   *    │        Weights in NOR flash @ 0x71000000  (<5 ms @ 1 GHz)
+   *    │
+   *    ▼
+   *  nn_out  float32[10]  — softmax probabilities for digits 0–9
+   *    │
+   *    │  [CPU] Postprocess: bubblesort → nn_ranking[] (highest prob first)
+   *    │         threshold: reject if top-1 < 0.70
+   *    │
+   *    ▼
+   *  LTDC layer 2  — classification results overlaid on camera preview
+   *  USART1        — per-frame log at 115200 baud
+   *    live mode : "[digit] confidence%  (Xms)"
+   *    TEST_MODE : "digit=N  predicted=M  OK|WRONG  (Xms)"
+   * =========================================================================
+   */
+
   /*** App Loop ***************************************************************/
   while (1)
   {
     CameraPipeline_IspUpdate();
 
+    /* --- [1] FRAME ACQUISITION --------------------------------------------- */
 #if TEST_MODE
     /* Cycle through digits 0-9, advancing every DIGIT_HOLD_MS milliseconds */
     static int     current_digit   = 0;
@@ -229,7 +281,8 @@ int main(void)
 
     uint32_t ts[2] = { 0 };
 
-    /* Preprocess: RGB888 uint8 → float32
+    /* --- [2] PREPROCESSING: RGB888 uint8 → float32 ---
+     * Preprocess: RGB888 uint8 → float32
      *   1. Rec.601 grayscale, inverted  (white paper→0, dark ink→1, matching MNIST)
      *   2. Adaptive background suppression: pixels below the midpoint of [vmin,vmax]
      *      are zeroed; the upper half is rescaled to [0,1].  This removes lighting
@@ -263,21 +316,25 @@ int main(void)
       SCB_CleanInvalidateDCache_by_Addr(nn_in, STAI_NETWORK_IN_1_SIZE_BYTES);
     }
 
+    /* --- [3] NPU INFERENCE ------------------------------------------------- */
     ts[0] = HAL_GetTick();
     ret = stai_network_run(network_context, STAI_MODE_SYNC);
     assert(ret == 0);
     ts[1] = HAL_GetTick();
 
+    /* Invalidate DCache so CPU sees the NPU-written nn_out values */
     for (int i = 0; i < (int)number_output; i++)
       SCB_InvalidateDCache_by_Addr(nn_out[i], nn_out_len[i]);
 
+    /* --- [4] POSTPROCESS + DISPLAY ----------------------------------------- */
     Network_Postprocess();
 
     Display_NetworkOutput(ts[1] - ts[0]);
 
 #if TEST_MODE
-    printf("digit=%d  predicted=%d  %s  (%lums)\r\n",
+    printf("digit=%d  predicted=%d  conf=%.0f%%  %s  (%lums)\r\n",
            current_digit, nn_ranking[0],
+           nn_top1_output_class_proba * 100.0f,
            (nn_ranking[0] == current_digit) ? "OK" : "WRONG",
            ts[1] - ts[0]);
 #else

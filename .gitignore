@@ -10,3 +10,10 @@
 *.cyclo
 *.map
 *.list
+
+# IDE workspace metadata (generated, not project source)
+.metadata/
+.claude/
+
+# Flash tool — install from STM32CubeProgrammer, don't commit
+STM32_Programmer_CLI.exe
