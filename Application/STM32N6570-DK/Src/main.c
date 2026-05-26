@@ -36,6 +36,12 @@
 #include "stlogo.h"
 #include "arm_math.h"
 
+#define TEST_MODE 0  /* 0 = live camera, 1 = synthetic digit cycling */
+#if TEST_MODE
+#include "digits.h"
+#define DIGIT_HOLD_MS 3000  /* ms to hold each digit before advancing */
+#endif
+
 CLASSES_TABLE;
 
 #define LCD_FG_WIDTH  SCREEN_WIDTH
@@ -85,6 +91,7 @@ BSP_LCD_LayerConfig_t LayerConfig = {0};
 void *pp_input;
 char const *nn_top1_output_class_name;
 float nn_top1_output_class_proba;
+int nn_ranking[NB_CLASSES];
 
 #define ALIGN_TO_16(value) (((value) + 15) & ~15)
 
@@ -144,12 +151,18 @@ int main(void)
   Hardware_init();
 
   /*** NN Init ****************************************************************/
-  uint32_t nn_in_len = 0;
   stai_size number_output = 0;
   stai_ptr nn_out[STAI_NETWORK_OUT_NUM] = {0};
   int32_t nn_out_len[STAI_NETWORK_OUT_NUM] = {0};
 
-  NeuralNetwork_init(&nn_in_len, nn_out, &number_output, nn_out_len);
+  {
+    uint32_t nn_in_len = 0;
+    NeuralNetwork_init(&nn_in_len, nn_out, &number_output, nn_out_len);
+  }
+
+  /* Warn if NOR flash is blank — weights at 0xFFFFFFFF produce NaN inference */
+  if (*(volatile uint32_t *)0x7101B200UL == 0xFFFFFFFFUL)
+    printf("[ERROR] NOR flash blank - run: STM32_Programmer_CLI ... -w Model/STM32N6570-DK/network_data.hex\r\n");
 
   /*** Post Processing Init ***************************************************/
   stai_network_info info;
@@ -159,36 +172,37 @@ int main(void)
   assert(ret == STAI_SUCCESS);
   pp_input = nn_out[0];
 
-  /*** Camera Init ************************************************************/
+  /*** Camera + LCD Init ******************************************************/
   uint32_t pitch_nn = 0;
   CameraPipeline_Init(&lcd_bg_area.XSize, &lcd_bg_area.YSize, &pitch_nn);
-
   LCD_init();
-
-  /* Start LCD Display camera pipe stream */
   CameraPipeline_DisplayPipe_Start(lcd_bg_buffer, CMW_MODE_CONTINUOUS);
 
-  /*** App header *************************************************************/
-  printf("========================================\n");
-  printf("STM32N6-GettingStarted-ImageClassification %s (%s)\n", APP_VERSION_STRING, APP_GIT_SHA1_STRING);
-  printf("Build date & time: %s %s\n", __DATE__, __TIME__);
-#if defined(__GNUC__)
-  printf("Compiler: GCC %d.%d.%d\n", __GNUC__, __GNUC_MINOR__, __GNUC_PATCHLEVEL__);
-#elif defined(__ICCARM__)
-  printf("Compiler: IAR EWARM %d.%d.%d\n", __VER__ / 1000000, (__VER__ / 1000) % 1000 ,__VER__ % 1000);
-#else
-  printf("Compiler: Unknown\n");
-#endif
-  printf("HAL: %lu.%lu.%lu\n", __STM32N6xx_HAL_VERSION_MAIN, __STM32N6xx_HAL_VERSION_SUB1, __STM32N6xx_HAL_VERSION_SUB2);
-  printf("STEdgeAI Tools: %d.%d.%d\n", STAI_TOOLS_VERSION_MAJOR, STAI_TOOLS_VERSION_MINOR, STAI_TOOLS_VERSION_MICRO);
-  printf("NN model: %s\n", STAI_NETWORK_ORIGIN_MODEL_NAME);
-  printf("========================================\n");
+  /*** Startup banner *********************************************************/
+  printf("========================================\r\n");
+  printf("MNIST Digit Classification - STM32N6570-DK\r\n");
+  printf("Model : %s\r\n", STAI_NETWORK_ORIGIN_MODEL_NAME);
+  printf("Build : %s %s\r\n", __DATE__, __TIME__);
+  printf("========================================\r\n");
 
   /*** App Loop ***************************************************************/
   while (1)
   {
     CameraPipeline_IspUpdate();
 
+#if TEST_MODE
+    /* Cycle through digits 0-9, advancing every DIGIT_HOLD_MS milliseconds */
+    static int     current_digit   = 0;
+    static uint32_t digit_start_ms = 0;
+    if (digit_start_ms == 0) digit_start_ms = HAL_GetTick();
+    if (HAL_GetTick() - digit_start_ms >= DIGIT_HOLD_MS)
+    {
+      current_digit  = (current_digit + 1) % 10;
+      digit_start_ms = HAL_GetTick();
+      printf("\r\n>>> Switching to digit %d <<<\r\n", current_digit);
+    }
+    memcpy(nn_raw, digits_table[current_digit], sizeof(nn_raw));
+#else
 #if DCMIPP_NN_NEEDS_CROP
     /* Start NN camera single capture Snapshot into intermediate buffer */
     CameraPipeline_NNPipe_Start(dcmipp_out_nn, CMW_MODE_SNAPSHOT);
@@ -199,8 +213,6 @@ int main(void)
 
     while (cameraFrameReceived == 0) {};
     cameraFrameReceived = 0;
-
-    uint32_t ts[2] = { 0 };
 
 #if DCMIPP_NN_NEEDS_CROP
     /*
@@ -213,35 +225,68 @@ int main(void)
     /* Invalidate dcache for the DMA-written nn_raw before CPU reads it */
     SCB_InvalidateDCache_by_Addr(nn_raw, sizeof(nn_raw));
 #endif
+#endif /* !TEST_MODE */
 
-    /* Preprocess: uint8 RGB888 → float32 grayscale, inverted, normalized [0,1] */
+    uint32_t ts[2] = { 0 };
+
+    /* Preprocess: RGB888 uint8 → float32
+     *   1. Rec.601 grayscale, inverted  (white paper→0, dark ink→1, matching MNIST)
+     *   2. Adaptive background suppression: pixels below the midpoint of [vmin,vmax]
+     *      are zeroed; the upper half is rescaled to [0,1].  This removes lighting
+     *      gradients that otherwise push background values to ~0.3 and confuse the
+     *      classifier. */
     {
       const uint8_t *src = nn_raw;
       float         *dst = (float *)nn_in;
-      for (int i = 0; i < STAI_NETWORK_IN_1_WIDTH * STAI_NETWORK_IN_1_HEIGHT; i++)
+      int n = STAI_NETWORK_IN_1_WIDTH * STAI_NETWORK_IN_1_HEIGHT;
+
+      float vmin = 1.0f, vmax = 0.0f;
+      for (int i = 0; i < n; i++)
       {
-        uint8_t r = src[3*i + 0];
-        uint8_t g = src[3*i + 1];
-        uint8_t b = src[3*i + 2];
-        /* BT.601 luminance, then invert (black-on-white → white-on-black MNIST) */
-        float gray = (0.299f * r + 0.587f * g + 0.114f * b);
+        float gray = 0.299f * src[3*i] + 0.587f * src[3*i+1] + 0.114f * src[3*i+2];
         float val  = (255.0f - gray) / 255.0f;
-        dst[3*i + 0] = val;
-        dst[3*i + 1] = val;
-        dst[3*i + 2] = val;
+        dst[3*i] = val;
+        if (val < vmin) vmin = val;
+        if (val > vmax) vmax = val;
+      }
+
+      float midpt    = (vmin + vmax) * 0.5f;
+      float hi_range = vmax - midpt;
+      if (hi_range < 0.005f) hi_range = 0.005f;
+      for (int i = 0; i < n; i++)
+      {
+        float raw = dst[3*i];
+        float v = (raw <= midpt) ? 0.0f : (raw - midpt) / hi_range;
+        if (v > 1.0f) v = 1.0f;
+        dst[3*i] = dst[3*i+1] = dst[3*i+2] = v;
       }
       SCB_CleanInvalidateDCache_by_Addr(nn_in, STAI_NETWORK_IN_1_SIZE_BYTES);
     }
 
     ts[0] = HAL_GetTick();
-    /* run ATON inference */
     ret = stai_network_run(network_context, STAI_MODE_SYNC);
     assert(ret == 0);
     ts[1] = HAL_GetTick();
 
+    for (int i = 0; i < (int)number_output; i++)
+      SCB_InvalidateDCache_by_Addr(nn_out[i], nn_out_len[i]);
+
     Network_Postprocess();
 
     Display_NetworkOutput(ts[1] - ts[0]);
+
+#if TEST_MODE
+    printf("digit=%d  predicted=%d  %s  (%lums)\r\n",
+           current_digit, nn_ranking[0],
+           (nn_ranking[0] == current_digit) ? "OK" : "WRONG",
+           ts[1] - ts[0]);
+#else
+    printf("[%d] %.0f%%  (%lums)\r\n",
+           nn_ranking[0],
+           nn_top1_output_class_proba * 100.0f,
+           ts[1] - ts[0]);
+#endif
+
     /* Discard nn_out region (used by pp_input and pp_outputs variables) to avoid Dcache evictions during nn inference */
     for (int i = 0; i < number_output; i++)
     {
@@ -274,22 +319,28 @@ static void Hardware_init(void)
   SystemClock_Config();
 
   CONSOLE_Config();
+  printf("\r\n[HW] UART OK\r\n");
 
   NPURam_enable();
+  printf("[HW] NPU RAM OK\r\n");
 
   Fuse_Programming();
+  printf("[HW] Fuse OK\r\n");
 
   NPUCache_config();
+  printf("[HW] NPU Cache OK\r\n");
 
   /*** External RAM and NOR Flash *********************************************/
   BSP_XSPI_RAM_Init(0);
   BSP_XSPI_RAM_EnableMemoryMappedMode(0);
+  printf("[HW] XSPI RAM OK\r\n");
 
   BSP_XSPI_NOR_Init_t NOR_Init;
   NOR_Init.InterfaceMode = BSP_XSPI_NOR_OPI_MODE;
   NOR_Init.TransferRate = BSP_XSPI_NOR_DTR_TRANSFER;
   BSP_XSPI_NOR_Init(0, &NOR_Init);
   BSP_XSPI_NOR_EnableMemoryMappedMode(0);
+  printf("[HW] XSPI NOR OK\r\n");
 
   /* Set all required IPs as secure privileged */
   Security_Config();
@@ -404,7 +455,8 @@ static void Security_Config(void)
   HAL_RIF_RISC_SetSlaveSecureAttributes(RIF_RISC_PERIPH_INDEX_LTDCL2 , RIF_ATTRIBUTE_SEC | RIF_ATTRIBUTE_PRIV);
 }
 
-static void IAC_Config(void)
+static void IAC_Config
+(void)
 {
 /* Configure IAC to trap illegal access events */
   __HAL_RCC_IAC_CLK_ENABLE();
@@ -432,8 +484,13 @@ static void Display_NetworkOutput(uint32_t inference_ms)
   assert(ret == HAL_OK);
 
   UTIL_LCD_Clear(0);
-  UTIL_LCDEx_PrintfAt(0, LINE(2), CENTER_MODE, "%s %.0f%%", nn_top1_output_class_name, nn_top1_output_class_proba * 100);
-  UTIL_LCDEx_PrintfAt(0, LINE(20), CENTER_MODE, "Inference: %ums", inference_ms);
+  for (int i = 0; i < NB_CLASSES; i++)
+  {
+    UTIL_LCDEx_PrintfAt(0, LINE(i + 1), CENTER_MODE, "%s: %.0f%%",
+                        classes_table[nn_ranking[i]],
+                        ((float *)(pp_input))[i] * 100.0f);
+  }
+  UTIL_LCDEx_PrintfAt(0, LINE(12), CENTER_MODE, "Inference: %ums", inference_ms);
 
   Display_WelcomeScreen();
 
@@ -459,7 +516,9 @@ void Network_Postprocess(void)
   Bubblesort((float *) (pp_input), ranking, NB_CLASSES);
 
   nn_top1_output_class_name  = classes_table[ranking[0]];
-  nn_top1_output_class_proba = *((float *) (pp_input));
+  nn_top1_output_class_proba = ((float *)(pp_input))[0];
+  for (int i = 0; i < NB_CLASSES; i++)
+    nn_ranking[i] = ranking[i];
 
   if (nn_top1_output_class_proba < 0.7f)
   {
