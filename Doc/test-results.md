@@ -57,8 +57,9 @@ This is a limitation of the synthetic test images, **not of the model itself** �
 
 ## Live Camera Results — Handwritten digits (paper)
 
-Tested with `TEST_MODE=0` and real handwritten digits on white paper, black marker, ~10 cm from camera.  
-Results shown are stable predictions over ~20 frames per digit.
+Tested with `TEST_MODE=0` and real handwritten digits on white paper, black marker, ~10–15 cm from camera.
+
+### Early test (digits 1, 2, 3, 5 — after background fix)
 
 | Digit | Confidence (stable) | Result | Notes |
 |-------|---------------------|--------|-------|
@@ -67,9 +68,24 @@ Results shown are stable predictions over ~20 frames per digit.
 | 3 | 100%   | ✅ | After background fix |
 | 5 | 98–99% | ✅ | Most reliable |
 
-**Handwritten accuracy: 4/4 tested (100%)**
+### Full handwritten test (digits 1–8, multiple passes)
 
-> Digits 0, 4, 6, 7, 8, 9 not tested on paper.
+| Digit | Stable prediction | Confidence | Result | Notes |
+|-------|-------------------|------------|--------|-------|
+| 1 | 1 | 83–98% | ✅ | Stable across multiple passes |
+| 2 | 2 | 88–100% | ✅ | Very reliable |
+| 3 | 3 | 63–76% | ⚠️ | Marginal — near or below 70% threshold |
+| 4 | 4 | 84–100% | ✅ | Most confident digit in the whole test |
+| 5 | 5 | 65–99% | ✅ | Good |
+| 6 | 6 | 70–98% | ✅ | Good in well-framed passes |
+| 7 | — | <35% | ❌ | Not recognised from handwriting |
+| 8 | 8 | 54–87% | ⚠️ | Low confidence, unstable |
+
+**Full handwritten accuracy: 5/8 strong ✅, 2/8 weak ⚠️, 1/8 not detected (7)**
+
+> Digit 7 recognised at 89–96% from PC screen but fails completely from handwriting.  
+> Likely cause: handwritten 7 stroke style (angle, serif) diverges from MNIST training distribution.  
+> Digit 3 is the weakest reliable digit — thicker strokes and good centering help.
 
 ---
 
