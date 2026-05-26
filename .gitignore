@@ -15,6 +15,9 @@
 .metadata/
 .claude/
 
+# ST HTML resource images (icons, ST branding — not project content)
+_htmresc/
+
 # STM32CubeIDE launch configurations (machine-specific)
 *.launch
 
