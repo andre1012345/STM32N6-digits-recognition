@@ -15,5 +15,11 @@
 .metadata/
 .claude/
 
+# STM32CubeIDE launch configurations (machine-specific)
+*.launch
+
 # Flash tool — install from STM32CubeProgrammer, don't commit
 STM32_Programmer_CLI.exe
+
+# Stale test headers not wired to any include
+Application/STM32N6570-DK/Inc/test_image.h

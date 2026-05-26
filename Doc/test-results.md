@@ -12,31 +12,50 @@
 Tested with `TEST_MODE=1`: 10 pre-rendered 32×32 synthetic images cycling through digits 0–9.  
 Each digit was held for 3 s (~75 frames per digit), results were 100% stable per digit.
 
+### Run 1 — original digits.h
+
 | Digit | Predicted | Confidence | Result | Note |
 |-------|-----------|------------|--------|------|
 | 0 | 0 | 100% | ✅ | |
-| 1 | 6 | 87%  | ❌ | Synthetic stroke off-center; real camera → 96–99% ✅ |
+| 1 | 6 | 87%  | ❌ | Synthetic stroke off-center |
 | 2 | 2 | 99%  | ✅ | |
 | 3 | 3 | 100% | ✅ | |
-| 4 | 8 | 62%  | ❌ | Synthetic image 7-segment style doesn't match MNIST |
+| 4 | 8 | 62%  | ❌ | 7-segment style |
 | 5 | 5 | 100% | ✅ | |
 | 6 | 6 | 100% | ✅ | |
-| 7 | 2 | 99%  | ❌ | Synthetic image 7-segment style doesn't match MNIST |
-| 8 | 0 | 96%  | ❌ | Synthetic image 7-segment style doesn't match MNIST |
-| 9 | 3 | 96%  | ❌ | Synthetic image 7-segment style doesn't match MNIST |
+| 7 | 2 | 99%  | ❌ | 7-segment style |
+| 8 | 0 | 96%  | ❌ | 7-segment style |
+| 9 | 3 | 96%  | ❌ | 7-segment style |
 
-**TEST_MODE accuracy: 5/10 (50%)**
+**Run 1 accuracy: 5/10 (50%)**
+
+### Run 2 — redesigned digits.h (1, 4, 7, 8, 9)
+
+| Digit | Predicted | Confidence | Result | Note |
+|-------|-----------|------------|--------|------|
+| 0 | 0 | 100% | ✅ | |
+| 1 | 6 | 78%  | ❌ | Thin stroke still ambiguous |
+| 2 | 2 | 99%  | ✅ | |
+| 3 | 3 | 100% | ✅ | |
+| 4 | 4 | 42%  | ✅ | Fixed by asymmetric redesign |
+| 5 | 5 | 100% | ✅ | |
+| 6 | 6 | 100% | ✅ | |
+| 7 | 2 | 100% | ❌ | Still fails — diagonal not captured at 32×32 |
+| 8 | 0 | 89%  | ❌ | Still fails — rectangular loops ≠ MNIST |
+| 9 | 2 | 84%  | ❌ | Still fails |
+
+**Run 2 accuracy: 6/10 (60%)**
 
 ### Why some synthetic digits fail
 
 The synthetic images use a **7-segment display style** (rectangular bars and vertical strokes).  
-The model was trained on **MNIST** (smooth, handwritten curves). For digits with loops or diagonals (4, 7, 8, 9), the rectangular pixel-art shapes don't activate the correct feature detectors in the CNN.
+The model was trained on **MNIST** (smooth, handwritten curves). For digits with loops or diagonals (7, 8, 9), the rectangular pixel-art shapes don't activate the correct feature detectors in the CNN.
 
-This is a limitation of the synthetic test images, **not of the model itself** — the live camera test on real handwritten digits shows much higher accuracy (see below).
+This is a limitation of the synthetic test images, **not of the model itself** — the live camera and screen tests show much higher accuracy.
 
 ---
 
-## Live Camera Results
+## Live Camera Results — Handwritten digits (paper)
 
 Tested with `TEST_MODE=0` and real handwritten digits on white paper, black marker, ~10 cm from camera.  
 Results shown are stable predictions over ~20 frames per digit.
@@ -45,12 +64,37 @@ Results shown are stable predictions over ~20 frames per digit.
 |-------|---------------------|--------|-------|
 | 1 | 96–99% | ✅ | Well-centered |
 | 2 | 87–97% | ✅ | Stable |
-| 3 | 100% | ✅ | After background fix |
+| 3 | 100%   | ✅ | After background fix |
 | 5 | 98–99% | ✅ | Most reliable |
 
-**Live camera accuracy: 4/4 tested (100%)**
+**Handwritten accuracy: 4/4 tested (100%)**
 
-> Digits 0, 4, 6, 7, 8, 9 not yet tested live. Digits 2↔3 and 1↔4 may confuse when handwriting is ambiguous or digit is tilted.
+> Digits 0, 4, 6, 7, 8, 9 not tested on paper.
+
+---
+
+## Live Camera Results — PC screen (digits 1–9)
+
+Tested with `TEST_MODE=0`, showing digits 1–9 from a PC monitor ~10–15 cm from camera.  
+Note: screen fonts differ from MNIST handwriting — lower contrast and different stroke style.
+
+| Digit | Stable prediction | Confidence | Result | Notes |
+|-------|-------------------|------------|--------|-------|
+| 0 | 0 | 96–100% | ✅ | Very stable |
+| 1 | 1 | 50–72%  | ⚠️ | Low confidence; sometimes confused with 7 |
+| 2 | 2 | 89–96%  | ✅ | Stable |
+| 3 | 3 | 97–100% | ✅ | Very stable |
+| 4 | 4 | 86–98%  | ✅ | Stable |
+| 5 | 5 | 81–88%  | ✅ | Stable |
+| 6 | — | —       | ❌ | Not reliably detected from screen (single frame at 68%) |
+| 7 | 7 | 89–96%  | ✅ | Very stable |
+| 8 | 8 | 52–65%  | ⚠️ | Correct but low confidence; needs better framing |
+| 9 | 9 | 79–93%  | ✅ | Stable |
+
+**Screen accuracy: 7/9 reliable ✅, 2/9 weak ⚠️, 1/9 not detected (6)**
+
+> Digits 1 and 8 benefit from handwritten input rather than screen fonts.  
+> Digit 6 was not reliably recognised from the screen — likely because sans-serif "6" looks different from MNIST handwritten 6.
 
 ---
 
@@ -94,7 +138,7 @@ for (int i = 0; i < n; i++) {
 
 ## Camera Setup
 
-- Distance: 10–15 cm from paper
+- Distance: 10–15 cm from paper / screen
 - Lighting: indoor ambient (ceiling LED)
-- Digit: black marker on A4 white paper, ~5–7 cm tall
+- Digit on paper: black marker on A4 white paper, ~5–7 cm tall
 - Orientation: digit upright, roughly centered in frame

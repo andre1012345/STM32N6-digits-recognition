@@ -36,7 +36,7 @@
 #include "stlogo.h"
 #include "arm_math.h"
 
-#define TEST_MODE 1  /* 0 = live camera, 1 = synthetic digit cycling */
+#define TEST_MODE 0  /* 0 = live camera, 1 = synthetic digit cycling */
 #if TEST_MODE
 #include "digits.h"
 #define DIGIT_HOLD_MS 3000  /* ms to hold each digit before advancing */
