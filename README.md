@@ -36,8 +36,9 @@ FSBL/
 └── ai_fsbl.hex             First-stage bootloader (rarely changes)
 
 Doc/
-├── test-results.md         Full accuracy measurements (3 test sessions)
-└── ST-reference/           ST documentation (boot, build, Neural-ART)
+├── preprocessing-and-inference.md  Detailed technical explanation of the pipeline
+├── test-results.md                 Full accuracy measurements (3 test sessions)
+└── ST-reference/                   ST documentation (boot, build, Neural-ART)
 
 Training/
 └── digitsMINST.ipynb       Colab notebook — CNN training, ONNX export, accuracy validation
