@@ -39,6 +39,9 @@ Doc/
 ├── test-results.md         Full accuracy measurements (3 test sessions)
 └── ST-reference/           ST documentation (boot, build, Neural-ART)
 
+Training/
+└── digitsMINST.ipynb       Colab notebook — CNN training, ONNX export, accuracy validation
+
 Middlewares/                ST middleware (camera driver, STEdgeAI runtime)
 STM32Cube_FW_N6/            ST firmware HAL — required for compilation, not modified
 
