@@ -29,23 +29,13 @@ This produces `Application/STM32CubeIDE/Debug/Project_sign.bin` (signing is auto
 
 ### Step 2 — Flash
 
-Set the board boot switch to **DEV mode**, then open a PowerShell terminal in the project root.
+Set the board boot switch to **DEV mode**, then open a PowerShell terminal in the project root:
 
-**First time ever (flash everything):**
 ```powershell
 .\flash.ps1 -Weights
 ```
-This flashes the bootloader (FSBL), the application, and the model weights to NOR flash. Takes ~30 seconds.
 
-**After rebuilding the application (code changes only):**
-```powershell
-.\flash.ps1 -AppOnly
-```
-
-**After changing the model only:**
-```powershell
-.\flash.ps1 -Weights
-```
+This flashes the bootloader, the application, and the model weights to NOR flash. Takes ~30 seconds.
 
 ---
 
