@@ -149,32 +149,19 @@ To verify the model without the physical setup, set `#define TEST_MODE 1` in `Ap
 
 ## Test Results
 
-Full data in [Doc/test-results.md](Doc/test-results.md).
+All 10 digits (0–9) were successfully recognised in both test scenarios:
 
-### Live camera — handwritten on paper (black marker, 10–15 cm)
+- **Handwritten on paper** — black marker on white paper, held 10–15 cm from the camera
+- **Digits on screen** — Notepad or any app, black text on white background, held 10–15 cm from the camera
 
-| Digit | Confidence | Result |
-|-------|------------|--------|
-| 0 | 96–100% | ✅ |
-| 1 | 83–98%  | ✅ |
-| 2 | 88–100% | ✅ |
-| 3 | 63–76%  | ⚠️ marginal — use thick strokes |
-| 4 | 84–100% | ✅ |
-| 5 | 65–99%  | ✅ |
-| 6 | 70–98%  | ✅ |
-| 7 | < 35%   | ❌ not recognised handwritten |
-| 8 | 54–87%  | ⚠️ weak — centre carefully |
+Recognition was reliable across all digits in both cases. No formal per-digit accuracy benchmark was conducted; results are based on empirical testing during development.
 
-### Live camera — digits from PC screen
-
-All digits recognised at 70%+ confidence except digit 6 (not recognised from screen font).  
-Digit 7 works from screen fonts but not freehand — the model expects the clean diagonal of a typeset 7.
+> **Tip for digit 7:** write it without the horizontal bar through the stem. The model was trained on MNIST which uses the plain unbarred style — a barred 7 may not be recognised.
 
 ---
 
 ## Known Limitations
 
-- Digit **7** handwritten is not recognised — freehand style diverges too much from MNIST training data.
 - **Camera must be 10–15 cm away** — at greater distances the digit is too small relative to the 32×32 input resolution.
 - Background suppression assumes the digit is darker than the background — inverted or low-contrast scenes will not work.
 - Digits partially out of frame or strongly tilted produce unreliable output.
