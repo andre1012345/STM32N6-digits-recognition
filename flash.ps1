@@ -11,7 +11,7 @@
     (only needed when the ONNX model changes, not on code changes).
 
 .PARAMETER Weights
-    Also flash Model/STM32N6570-DK/network_data.hex.
+    Also flash Model/network_atonbuf.xSPI2.raw at 0x71000000 (NOR flash).
 
 .PARAMETER AppOnly
     Skip the FSBL, flash only the application binary.
@@ -33,8 +33,8 @@ $ROOT   = $PSScriptRoot
 $CLI    = "C:\Program Files\STMicroelectronics\STM32Cube\STM32CubeProgrammer\bin\STM32_Programmer_CLI.exe"
 $DKEL   = "C:\Program Files\STMicroelectronics\STM32Cube\STM32CubeProgrammer\bin\ExternalLoader\MX66UW1G45G_STM32N6570-DK.stldr"
 $FSBL   = "$ROOT\FSBL\ai_fsbl.hex"
-$APP    = "$ROOT\Application\STM32N6570-DK\STM32CubeIDE\Debug\Project_sign.bin"
-$MODEL  = "$ROOT\Model\STM32N6570-DK\network_data.hex"
+$APP    = "$ROOT\Application\STM32CubeIDE\Debug\Project_sign.bin"
+$MODEL  = "$ROOT\Model\network_atonbuf.xSPI2.bin"
 
 # ── Checks ───────────────────────────────────────────────────────────────────
 if (-not (Test-Path $CLI))   { Write-Error "STM32CubeProgrammer not found at:`n  $CLI`nInstall it from st.com"; exit 1 }
@@ -65,7 +65,7 @@ Flash "Application" $APP "0x70100000"
 
 if ($Weights) {
     if (-not (Test-Path $MODEL)) { Write-Error "Model weights not found: $MODEL"; exit 1 }
-    Flash "Model weights" $MODEL $null
+    Flash "Model weights" $MODEL "0x71000000"
 }
 
 Write-Host "Done. Set boot switch to BOOT FROM FLASH and power cycle." -ForegroundColor Green

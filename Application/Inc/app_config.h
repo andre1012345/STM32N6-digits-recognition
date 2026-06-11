@@ -40,19 +40,10 @@
 /* Classes */
 #define NB_CLASSES   (10)
 #define CLASSES_TABLE static const char* classes_table[NB_CLASSES] = {\
-    "This number is digit zero",\
-    "This number is digit one",\
-    "This number is digit two",\
-    "This number is digit three",\
-    "This number is digit four",\
-    "This number is digit five",\
-    "This number is digit six",\
-    "This number is digit seven",\
-    "This number is digit eight",\
-    "This number is digit nine"}
+    "0", "1", "2", "3", "4", "5", "6", "7", "8", "9"}
 
 /* Display */
-#define WELCOME_MSG_1         "mnist_cnn_32x32_int8.onnx"
+#define WELCOME_MSG_1         "mnist_cnn_32x32_aug_int8"
 #define WELCOME_MSG_2         "Model Running on STM32N6570-DK NPU"
 
 #endif
